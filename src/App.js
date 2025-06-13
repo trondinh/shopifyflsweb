@@ -14,15 +14,7 @@ const App = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
-  const config = {
-    apiKey: process.env.REACT_APP_SHOPIFY_API_KEY,
-    host: new URLSearchParams(window.location.search).get("host"),
-    forceRedirect: true
-};
-
-const app = createApp(config);
-
-  const isEmbedded = !!app;
+  
 
   // Handle auth success redirect
   useEffect(() => {
@@ -35,6 +27,20 @@ const app = createApp(config);
       navigate('/', { replace: true });
     }
   }, [searchParams, navigate]);
+
+const session = JSON.parse(localStorage.getItem('shopify_session'));
+
+// Chỉ khởi tạo App Bridge nếu có host
+const config = session?.host ? {
+  apiKey: process.env.REACT_APP_SHOPIFY_API_KEY,
+  host: session?.host,
+  forceRedirect: true,
+} : null;
+
+const app = config ? createApp(config) : null;
+
+
+  const isEmbedded = !!app;
 
   const handleConnect = async () => {
     if (!shopName) {
