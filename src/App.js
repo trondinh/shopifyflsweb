@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
 import { Page, Card, Button, TextField, Banner, Layout, Spinner } from '@shopify/polaris';
 import { getSessionToken } from '@shopify/app-bridge-utils';
 import axios from 'axios';
 import createApp from '@shopify/app-bridge';
-
-
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const App = () => {
   const [shopName, setShopName] = useState('');
@@ -12,17 +11,30 @@ const App = () => {
   const [error, setError] = useState('');
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   
-const config = {
+  const config = {
     apiKey: process.env.REACT_APP_SHOPIFY_API_KEY,
     host: new URLSearchParams(window.location.search).get("host"),
     forceRedirect: true
 };
 
 const app = createApp(config);
-  
-  // Check if we're running in Shopify admin
+
   const isEmbedded = !!app;
+
+  // Handle auth success redirect
+  useEffect(() => {
+    const shop = searchParams.get('shop');
+    const host = searchParams.get('host');
+    
+    if (shop && host) {
+      // Store session in localStorage (for demo only - use cookies in production)
+      localStorage.setItem('shopify_session', JSON.stringify({ shop, host }));
+      navigate('/', { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   const handleConnect = async () => {
     if (!shopName) {
@@ -35,20 +47,20 @@ const app = createApp(config);
 
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_BACKEND_URL}/auth-url`, 
+        `${process.env.REACT_APP_BACKEND_URL}/auth`, 
         { shop: `${shopName}.myshopify.com` }
       );
       window.location.href = response.data.authUrl;
     } catch (err) {
       console.error('Connection error:', err);
-      setError('Failed to connect to Shopify. Please try again.');
+      setError(err.response?.data?.error || 'Failed to connect to Shopify');
       setIsConnecting(false);
     }
   };
 
   const fetchProducts = async () => {
-    if (!app) {
-      setError('App Bridge not initialized');
+    if (!isEmbedded) {
+      setError('App must be loaded in Shopify admin');
       return;
     }
 
@@ -57,18 +69,20 @@ const app = createApp(config);
 
     try {
       const token = await getSessionToken(app);
+      const session = JSON.parse(localStorage.getItem('shopify_session'));
+      
       const response = await axios.get(
         `${process.env.REACT_APP_BACKEND_URL}/api/products`,
         {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          params: { shop: session?.shop },
+          headers: { 'Authorization': `Bearer ${token}` }
         }
       );
+      
       setProducts(response.data.products || []);
     } catch (err) {
       console.error('API Error:', err);
-      setError('Failed to fetch products. Please try again.');
+      setError(err.response?.data?.error || 'Failed to fetch products');
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +134,10 @@ const app = createApp(config);
             <Card title="Products" sectioned>
               <ul>
                 {products.map(product => (
-                  <li key={product.id}>{product.title}</li>
+                  <li key={product.id}>
+                    <h3>{product.title}</h3>
+                    <p>{product.variants?.length} variants</p>
+                  </li>
                 ))}
               </ul>
             </Card>
