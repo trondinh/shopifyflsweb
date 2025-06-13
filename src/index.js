@@ -1,17 +1,43 @@
 import React from 'react';
-import ReactDOM from 'react-dom/client';
-import './index.css';
+import ReactDOM from 'react-dom';
+import { BrowserRouter } from 'react-router-dom';
 import App from './App';
-import reportWebVitals from './reportWebVitals';
+import { AppProvider as PolarisProvider } from '@shopify/polaris';
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
+// Initialize App Bridge only when in Shopify admin context
+const AppWrapper = () => {
+  const params = new URLSearchParams(window.location.search);
+  const host = params.get('host');
+  const apiKey = process.env.REACT_APP_SHOPIFY_API_KEY;
+
+  if (!host) {
+    return (
+      <PolarisProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </PolarisProvider>
+    );
+  }
+
+  const config = {
+    apiKey,
+    host,
+    forceRedirect: true,
+  };
+
+  return (
+    <PolarisProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+    </PolarisProvider>
+  );
+};
+
+ReactDOM.render(
   <React.StrictMode>
-    <App />
-  </React.StrictMode>
+    <AppWrapper />
+  </React.StrictMode>,
+  document.getElementById('root')
 );
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();
